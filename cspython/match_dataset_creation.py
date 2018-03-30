@@ -3,6 +3,7 @@ from cspython.merging_processing import combine_dfs
 sys.setrecursionlimit(15000)
 import numpy as np
 import pandas as pd
+import itertools
 #############################################################################################################
 # match_dataset_creation.py comes in three parts.
 # 1.the creation of columns using the unchanged player data dataset that comes from merging_processing.py. "player_based_column_making(data)"
@@ -55,14 +56,14 @@ def create_matches_count(data):  # how many matches a team has played
     teams = list(data.player_team_name.unique())
     new_group = pd.DataFrame()
     for a in teams:
-        data_team = data.loc[data.loc[:, 'player_team_name'] == a,].sort_values(by='date', ascending=True)
-        grouping = data_team.groupby(['player_team_name', 'date', 'match_id'])['ADR'].count()
+        data_team = data.loc[data.loc[:, 'player_team_name'] == a,].sort_values(by=['date', 'series_id','match_num'], ascending=True)
+        grouping = data_team.groupby(['player_team_name', 'date', 'series_id','match_num'])['ADR'].count()
         grouping = pd.DataFrame(grouping)
         grouping = grouping.reset_index()
         grouping.loc[:, 'ADR'] = grouping.loc[:, 'ADR'].expanding(min_periods=1, freq=None, center=False, axis=0).sum()
         grouping = grouping.rename(index=str, columns={'ADR': 'matches_played_team'})
         new_group = pd.concat([new_group, grouping])
-    data = pd.merge(data, new_group, on=['player_team_name', 'match_id', 'date'])
+    data = pd.merge(data, new_group, on=['player_team_name', 'date', 'series_id','match_num'])
     return data
 
 
@@ -70,14 +71,14 @@ def create_avdamage_his(data):  # column with historic average damage of individ
     teams = list(data.player_team_name.unique())
     new_group = pd.DataFrame()
     for a in teams:
-        data_team = data.loc[data.loc[:, 'player_team_name'] == a,].sort_values(by='date', ascending=True)
-        grouping = data_team.groupby(['player_team_name', 'date', 'match_id'])['ADR'].max()
+        data_team = data.loc[data.loc[:, 'player_team_name'] == a,].sort_values(by=['date', 'series_id','match_num'], ascending=True)
+        grouping = data_team.groupby(['player_team_name', 'date','series_id','match_num'])['ADR'].max()
         grouping = pd.DataFrame(grouping)
         grouping = grouping.reset_index()
         grouping.loc[:, 'ADR'] = grouping.loc[:, 'ADR'].expanding(min_periods=1, freq=None, center=False, axis=0).mean()
         grouping = grouping.rename(index=str, columns={'ADR': 'ADR_hist'})
         new_group = pd.concat([new_group, grouping])
-    data = pd.merge(data, new_group, on=['player_team_name', 'match_id', 'date'])
+    data = pd.merge(data, new_group, on=['player_team_name', 'date','series_id','match_num'])
     return data
 
 
@@ -88,8 +89,8 @@ def create_avdamage_map_his(data):  # historic average damage of individual for 
     for a in maps:
         for b in teams:
             data_team = data.loc[(data.loc[:, 'player_team_name'] == b) & (data.loc[:, 'map'] == a),].sort_values(
-                by='date', ascending=True)
-            grouping = data_team.groupby(['player_team_name', 'match_id'])['ADR'].max()
+                by=['date', 'series_id','match_num'], ascending=True)
+            grouping = data_team.groupby(['player_team_name', 'date', 'series_id','match_num'])['ADR'].max()
             grouping = pd.DataFrame(grouping)
             grouping = grouping.reset_index()
             grouping.loc[:, 'ADR'] = grouping.loc[:, 'ADR'].expanding(min_periods=1, freq=None, center=False,
@@ -97,7 +98,7 @@ def create_avdamage_map_his(data):  # historic average damage of individual for 
             grouping = grouping.rename(index=str, columns={'ADR': 'ADR_hist_on_map'})
             new_group = pd.concat([new_group, grouping])
 
-    data = pd.merge(data, new_group, on=['match_id', 'player_team_name'])
+    data = pd.merge(data, new_group, on=['player_team_name', 'date', 'series_id', 'match_num'])
 
     return data
 
@@ -106,14 +107,14 @@ def create_fwadr_his(data, col_list): # historic first/awp/who kills divided by 
     for b in col_list:
         new_group = pd.DataFrame()
         for a in teams:
-            data_team = data.loc[data.loc[:,'player_team_name'] == a, ].sort_values(by='date',ascending=True)
-            grouping = data_team.groupby(['player_team_name','date','match_id'])[b+'_sum_dr'].max()
+            data_team = data.loc[data.loc[:,'player_team_name'] == a, ].sort_values(by=['date','series_id','match_num'],ascending=True)
+            grouping = data_team.groupby(['player_team_name', 'date', 'series_id', 'match_num'])[b+'_sum_dr'].max()
             grouping = pd.DataFrame(grouping)
             grouping = grouping.reset_index()
             grouping.loc[:,b +'_sum_dr'] = grouping.loc[:,b +'_sum_dr'].expanding(min_periods=1, freq=None, center=False, axis=0).mean()
             grouping = grouping.rename(index=str, columns={b +'_sum_dr': b + '_sum_dr_hist'})
             new_group = pd.concat([new_group, grouping])
-        data = pd.merge(data, new_group, on = ['player_team_name','match_id','date'])
+        data = pd.merge(data, new_group, on = ['player_team_name', 'date', 'series_id','match_num'])
     return data
 
 
@@ -125,8 +126,8 @@ def create_faw_map_his(data, col_list): # historic first/awp/who kills divided b
         for i in maps:
             for a in teams:
                 data_team = data.loc[(data.loc[:, 'player_team_name'] == a) & (data.loc[:, 'map'] == i),].sort_values(
-                    by='date', ascending=True)
-                grouping = data_team.groupby(['player_team_name', 'match_id'])[b + '_sum_dr'].max()
+                    by=['date', 'series_id','match_num'], ascending=True)
+                grouping = data_team.groupby(['player_team_name', 'date', 'series_id','match_num'])[b + '_sum_dr'].max()
                 grouping = pd.DataFrame(grouping)
                 grouping = grouping.reset_index()
                 grouping.loc[:, b + '_sum_dr'] = grouping.loc[:, b + '_sum_dr'].expanding(min_periods=1, freq=None,
@@ -134,7 +135,7 @@ def create_faw_map_his(data, col_list): # historic first/awp/who kills divided b
                 grouping = grouping.rename(index=str, columns={b + '_sum_dr': b + '_sum_dr_hist_on_map'})
                 new_group = pd.concat([new_group, grouping])
 
-        data = pd.merge(data, new_group, on=['match_id', 'player_team_name'])
+        data = pd.merge(data, new_group, on=['player_team_name', 'date', 'series_id', 'match_num'])
     return data
 
 def create_historic_data(data): # all the functions  that are creating match based historic data
@@ -144,6 +145,7 @@ def create_historic_data(data): # all the functions  that are creating match bas
     data = create_avdamage_his(data)
     data = create_avdamage_map_his(data)
     data = create_faw_map_his(data, col_list)
+
     return data
     
 def count_map_win_loss_total(df): #this function assumes the df contains only rows from one team
@@ -177,7 +179,7 @@ def count_map_win_loss_total(df): #this function assumes the df contains only ro
 
 
 def create_map_win_loss_and_per_his_columns(data):  # team total win and loses on map with total times played on map !4!
-    data.sort_values('date', inplace=True)
+    data.sort_values(['date', 'series_id','match_num'], inplace=True)
     data.index = range(len(data))
     original_col_order = data.columns.tolist()
     data = data.groupby('player_team_name').apply(count_map_win_loss_total)
@@ -220,7 +222,7 @@ def count_rounds_won_vs_opponent(df): #parsing a df of 1 team
 
 
 def create_rounds_won_and_lost_vs_team_his(data): #applied to entire dataset
-    data.sort_values('date', inplace = True)
+    data.sort_values(['date', 'series_id', 'match_num'], inplace = True)
     data = data.groupby('player_team_name').apply(count_rounds_won_vs_opponent)
     return data
 
@@ -239,7 +241,7 @@ def count_rounds_won_vs_opponent_on_map(df): # parsing a df of 1 team
 
 
 def create_rounds_won_and_lost_vs_team_by_map_his(data):
-    data.sort_values('date', inplace = True)
+    data.sort_values(['date', 'series_id', 'match_num'], inplace = True)
     data = data.groupby(['player_team_name', 'player_team_opponent', 'map']).apply(count_rounds_won_vs_opponent_on_map)
     
     for team, opponent, map_name in itertools.product(data.player_team_name.unique(), data.player_team_opponent.unique(), data.map.unique()):
@@ -256,8 +258,6 @@ def create_rounds_won_and_lost_vs_team_by_map_his(data):
         col = data.loc[data.player_team_name == team, 'rounds_loss_vs_'+opponent+'_on_'+map_name].fillna(0)
         data.loc[data.player_team_name == team, 'rounds_loss_vs_'+opponent+'_on_'+map_name] = col
     return data
-    
-    
 def create_round_his_cols(data):
     original_col_order = data.columns.tolist()
     data = create_rounds_won_rounds_loss_columns(data)
@@ -281,8 +281,8 @@ def aggregate_data_over_time(data): #adds aggregate columns
     
     
 if __name__ == '__main__':
-    data = combine_dfs(overview, big_data)
-    data = match_dataset_creation(data)
-    data = aggregate_data_over_time(data)
+    #data = combine_dfs(overview, big_data)
+    #data = match_dataset_creation(data)
+    #data = aggregate_data_over_time(data)
 
     pass
